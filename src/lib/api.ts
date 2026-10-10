@@ -40,6 +40,7 @@ export interface DbSavedPath {
 
 /** Fetch all users (uses vw_user_profiles so password_hash is never sent). */
 export async function fetchAllUsers(): Promise<DbUser[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from('vw_user_profiles')
     .select('*')
@@ -55,6 +56,7 @@ export async function verifyCredentials(
   email: string,
   password: string
 ): Promise<DbUser | null> {
+  if (!supabase) return null;
   // Uses Postgres crypt() via RPC to compare the hash safely on the server.
   const { data, error } = await supabase.rpc('verify_user_password', {
     p_email: email,
@@ -73,6 +75,7 @@ export async function createUser(params: {
   role: Role;
   branch?: string;
 }): Promise<DbUser> {
+  if (!supabase) throw new Error('Cannot create DB user in offline mode');
   const { data, error } = await supabase.rpc('create_user_account', {
     p_name:     params.name,
     p_email:    params.email,
@@ -90,6 +93,7 @@ export async function patchUser(
   id: string,
   updates: Partial<Pick<DbUser, 'name' | 'branch' | 'email' | 'role' | 'is_active'>>
 ): Promise<DbUser> {
+  if (!supabase) throw new Error('Cannot patch DB user in offline mode');
   const { data, error } = await supabase
     .from('users')
     .update(updates)
@@ -103,6 +107,7 @@ export async function patchUser(
 
 /** Soft-delete: mark a user as inactive. */
 export async function softDeleteUser(id: string): Promise<void> {
+  if (!supabase) return;
   const { error } = await supabase
     .from('users')
     .update({ is_active: false })
@@ -115,6 +120,7 @@ export async function softDeleteUser(id: string): Promise<void> {
 
 /** Fetch all active career paths. */
 export async function fetchCareerPaths(branch?: string): Promise<DbCareerPath[]> {
+  if (!supabase) return [];
   let query = supabase
     .from('career_paths')
     .select('*')
@@ -135,6 +141,7 @@ export async function fetchCareerPaths(branch?: string): Promise<DbCareerPath[]>
 
 /** Fetch all career paths a student has saved, with career path details joined. */
 export async function fetchSavedPaths(studentId: string): Promise<DbSavedPath[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from('saved_paths')
     .select('*, career_paths(*)')
@@ -151,6 +158,7 @@ export async function saveCareerPath(
   careerPathId: string,
   notes?: string
 ): Promise<void> {
+  if (!supabase) return;
   const { error } = await supabase.from('saved_paths').insert({
     student_id:     studentId,
     career_path_id: careerPathId,
@@ -164,6 +172,7 @@ export async function unsaveCareerPath(
   studentId: string,
   careerPathId: string
 ): Promise<void> {
+  if (!supabase) return;
   const { error } = await supabase
     .from('saved_paths')
     .delete()
@@ -179,6 +188,7 @@ export async function logImpersonationStart(
   actorId: string,
   impersonatedId: string
 ): Promise<string> {
+  if (!supabase) return 'offline-log-id';
   const { data, error } = await supabase
     .from('impersonation_log')
     .insert({ actor_id: actorId, impersonated_id: impersonatedId })
@@ -191,6 +201,7 @@ export async function logImpersonationStart(
 
 /** Mark an impersonation session as ended. */
 export async function logImpersonationEnd(logId: string): Promise<void> {
+  if (!supabase) return;
   const { error } = await supabase
     .from('impersonation_log')
     .update({ ended_at: new Date().toISOString() })
